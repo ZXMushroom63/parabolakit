@@ -100,7 +100,7 @@
         this is a WIP btw
     </div>
     <ins style="position: fixed;z-index: 100;left:0;bottom:0;pointer-events: none;user-select: none; color:magenta">
-        Made by ZXMushroom63
+       v1.2
     </ins>
     <script>
         const canvas = document.querySelector("canvas");
@@ -224,7 +224,7 @@
             return [a, hb, c - (b ** 2 / (4 * a))];
         }
         function getKlerp(n1, n2) {
-            return ` k\\left(${(n2-n1).toFixed(3)}\\right)+${n1.toFixed(3)} `;
+            return ` k\\left(${(n2).toFixed(3)}-${(n1).toFixed(3)}\\right)+${n1.toFixed(3)} `;
         }
         const graphDB = {
             "circle": {
@@ -272,10 +272,10 @@
                 defaultHandles: [[-2, 0.5], [2, -0.5]],
                 getDef: (handles, transforms) => {
                     const m = (handles[0][1] - handles[1][1])/(handles[0][0]-handles[1][0]);
-                    let c = -m*handles[0][0];
+                    let c = handles[0][1] - m * handles[0][0];
                     
                     const mT = (transforms[0][1] - transforms[1][1])/(transforms[0][0]-transforms[1][0]);
-                    let c_t = -mT*transforms[0][0];
+                    let c_t = transforms[0][1] - mT * transforms[0][0];
                     let out = `y = ${
                     m.toFixed(3)
                     }x${formatNum(c)}; ${
