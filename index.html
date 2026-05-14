@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plot thing</title>
+    <style>
+        html,
+        body {
+            background-color: black;
+            color: white;
+            font-family: sans-serif;
+        }
+
+        ins {
+            text-decoration: none;
+        }
+
+        ul {
+            position: fixed;
+            top: 0;
+            left: 0;
+            display: block;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 101;
+            margin-top: 0;
+            border-radius: 6px;
+            list-style: georgian;
+            padding: 4px;
+            padding-left: 24px;
+            user-select: none;
+            pointer-events: none;
+        }
+
+        canvas {
+            height: 100vh;
+            position: fixed;
+            z-index: 99;
+            top: 0px;
+            left: calc((100vw - (1920/1080 * 100vh)) / 2);
+            image-rendering: optimizeQuality;
+            border-left: 1px solid grey;
+            border-right: 1px solid grey;
+            background-color: rgba(0, 0, 20);
+        }
+
+        li[data-x] {
+            text-decoration: underline;
+            cursor: pointer;
+            pointer-events: all;
+            display: inline;
+        }
+        #export {
+            position: fixed;
+            left: 1rem;
+            top: 1rem;
+            bottom: 1rem;
+            right: 1rem;
+            background-color: rgba(0, 0, 0, 0.8);
+            border-radius: 6px;
+            text-shadow: 0px 0px 4px black;
+            padding: 8px;
+            border: 2px solid white;
+            z-index: 102;
+            overflow-y: auto;
+            pointer-events: all;
+        }
+        input {
+            user-select: all;
+            background: transparent;
+            border: 2px solid white;
+            border-radius: 5px;
+            outline: transparent;
+            color: white;
+        }
+    </style>
+</head>
+
+<body>
+    <ul>
+        <li>(click = add)</li>
+        <li data-x="parabola">Parabola</li><br> <!-- 3 handles -->
+        <li data-x="linear">Linear</li><br> <!-- 2 handles -->
+        <li data-x="cubic">Cubic</li><br> <!-- 4 handles -->
+        <li data-x="disabled_inverse">Inverse/Hyperbola</li><br> <!-- 2 handles -->
+        <li data-x="circle">Circle</li><br> <!-- 2 handles -->
+        <li id="total">DEL=delete, E=export</li>
+        <li>SHIFT+RMB for ref image</li>
+        <li>H to toggle handles</li>
+        <li>Q to flip sides</li>
+    </ul>
+    <img id="bg" style="display: none;">
+    <canvas width="1920" height="1080">
+
+    </canvas>
+    <div id="export" style="display: none;">
+        esc to close ig<br><br>
+
+        this is a WIP btw
+    </div>
+    <script>
+        const canvas = document.querySelector("canvas");
+        const ctx = canvas.getContext("2d");
+        // working res = 960x1080
+        function pixelToMath(xy) {
+            return [
+                (xy[0] - 480) / 48,
+                (xy[1] - 540) / 48
+            ]
+        }
+        function mathToPixel(xy) {
+            return [
+                (xy[0] * 48) + 480,
+                (xy[1] * 48) + 540
+            ]
+        }
+        function unitToPixel(k) {
+            return k * 48;
+        }
+        const imageContainer = ctx.createImageData(1920, 1080, { colorSpace: "srgb" });
+        const fb = imageContainer.data;
+        const gizmos = localStorage.getItem("kwwkam11100412") ? JSON.parse(localStorage.getItem("kwwkam11100412")) : [
+            {
+                type: "circle",
+                handlePositions: [[0, 0], [3, 0]],
+                transformedPositions: [[0, 0], [4, 0]],
+                col: "blue",
+                let: "A"
+            }
+        ];
+        function findParabolaCoefficients(h1, h2, h3) {
+            const [x1, y1] = h1;
+            const [x2, y2] = h2;
+            const [x3, y3] = h3;
+            let denominator = (x1 - x2) * (x1 - x3) * (x2 - x3);
+
+            let a = (x3 * (y2 - y1) + x2 * (y1 - y3) + x1 * (y3 - y2)) / denominator;
+            let b = ((x3 ** 2) * (y1 - y2) + (x2 ** 2) * (y3 - y1) + (x1 ** 2) * (y2 - y3)) / denominator;
+            let c = ((x1 ** 2) * (x2 * y3 - x3 * y2) + (x2 ** 2) * (x3 * y1 - x1 * y3) + (x3 ** 2) * (x1 * y2 - x2 * y1)) / denominator;
+
+            return [a, b, c];
+        };
+        function findHyperbolaCoefficients(p1, p2, p3) {
+            const [x1, y1] = p1;
+            const [x2, y2] = p2;
+            const [x3, y3] = p3;
+            
+            const det = (x1 * (y3 - y2) + x2 * (y1 - y3) + x3 * (y2 - y1));
+
+            if (Math.abs(det) < 1e-10) {
+                return [0,0,0];
+            }
+
+            const a = (x1 * y1 * (y3 - y2) + x2 * y2 * (y1 - y3) + x3 * y3 * (y2 - y1)) / det;
+            const b = (x1 * y1 * (x3 * y2 - x2 * y3) + x2 * y2 * (x1 * y3 - x3 * y1) + x3 * y3 * (x2 * y1 - x1 * y2)) / det;
+            const c = (x1 * (x3 * y3 - x2 * y2) + x2 * (x1 * y1 - x3 * y3) + x3 * (x2 * y2 - x1 * y1)) / det;
+
+            //y = (a*x + b) / (x + c)
+            return [ a, b, c ];
+        }
+        function findCubicCoefficients(p1, p2, p3, p4) {
+            const [x1, y1] = p1;
+            const [x2, y2] = p2;
+            const [x3, y3] = p3;
+            const [x4, y4] = p4;
+            const det4x4 = (m) => {
+                return (
+                    m[0][0] * (m[1][1] * (m[2][2] * m[3][3] - m[2][3] * m[3][2]) - m[1][2] * (m[2][1] * m[3][3] - m[2][3] * m[3][1]) + m[1][3] * (m[2][1] * m[3][2] - m[2][2] * m[3][1])) -
+                    m[0][1] * (m[1][0] * (m[2][2] * m[3][3] - m[2][3] * m[3][2]) - m[1][2] * (m[2][0] * m[3][3] - m[2][3] * m[3][0]) + m[1][3] * (m[2][0] * m[3][2] - m[2][2] * m[3][0])) +
+                    m[0][2] * (m[1][0] * (m[2][1] * m[3][3] - m[2][3] * m[3][1]) - m[1][1] * (m[2][0] * m[3][3] - m[2][3] * m[3][0]) + m[1][3] * (m[2][0] * m[3][1] - m[2][1] * m[3][0])) -
+                    m[0][3] * (m[1][0] * (m[2][1] * m[3][2] - m[2][2] * m[3][1]) - m[1][1] * (m[2][0] * m[3][2] - m[2][2] * m[3][0]) + m[1][2] * (m[2][0] * m[3][1] - m[2][1] * m[3][0]))
+                );
+            };
+            const M = [
+                [x1 ** 3, x1 ** 2, x1, 1],
+                [x2 ** 3, x2 ** 2, x2, 1],
+                [x3 ** 3, x3 ** 2, x3, 1],
+                [x4 ** 3, x4 ** 2, x4, 1]
+            ];
+            const mainDet = det4x4(M);
+            if (Math.abs(mainDet) < 1e-10) {
+                return [0, 0, 0, 0];
+            }
+            const getColDet = (colIdx) => {
+                const copy = M.map((row, i) => {
+                    const newRow = [...row];
+                    newRow[colIdx] = [y1, y2, y3, y4][i];
+                    return newRow;
+                });
+                return det4x4(copy);
+            };
+            let a = getColDet(0) / mainDet;
+            let b = getColDet(1) / mainDet;
+            let c = getColDet(2) / mainDet;
+            let d = getColDet(3) / mainDet;
+            return [a, b, c, d];
+        }
+
+        function dist(a, b) {
+            return Math.sqrt(
+                Math.pow(a[0] - b[0], 2) +
+                Math.pow(a[1] - b[1], 2)
+            );
+        }
+        function formatNum(c) {
+            if (c > 0) {
+                c = " + " + c.toFixed(3);
+            } else if (c < 0) {
+                c = " - " + (-c).toFixed(3);
+            } else {
+                c = "";
+            }
+            return c;
+        }
+        function generalToTP(a, b, c) {
+            //a(x + h)^2 + k
+            const hb = (b/a)/2;
+            const b2 = hb**2;
+            // a(x+hb)^2 + c + b2
+            return [a, hb, c - (b ** 2 / (4 * a))];
+        }
+        function getKlerp(n1, n2) {
+            return ` k\\left(${(n2-n1).toFixed(3)}\\right)+${n1.toFixed(3)} `;
+        }
+        const graphDB = {
+            "circle": {
+                defaultHandles: [[0, 0], [0, 3]],
+                drawGraph: (handles, side, c) => {
+                    ctx.lineWidth = 2;
+                    ctx.strokeStyle = c || "blue";
+                    ctx.beginPath();
+                    const radius = Math.sqrt(
+                        Math.pow(handles[0][0] - handles[1][0], 2) +
+                        Math.pow(handles[0][1] - handles[1][1], 2)
+                    );
+                    const root = mathToPixel(handles[0]);
+                    const r = unitToPixel(radius);
+                    ctx.arc(root[0] + 960 * side, root[1], r, 0, Math.PI * 2);
+                    ctx.stroke();
+                },
+                getDef: (handles, trans) => {
+                    const radius = Math.sqrt(
+                        Math.pow(handles[0][0] - handles[1][0], 2) +
+                        Math.pow(handles[0][1] - handles[1][1], 2)
+                    );
+                    const radius2 = Math.sqrt(
+                        Math.pow(trans[0][0] - trans[1][0], 2) +
+                        Math.pow(trans[0][1] - trans[1][1], 2)
+                    );
+                    const xOffset = formatNum(-handles[0][0]);
+                    const yOffset = formatNum(-handles[0][1]);
+                    let out = `(x${xOffset})² + (y${yOffset})² = ${(radius**2).toFixed(3)} = (${radius.toFixed(3)})²`
+                    
+                    out += `\n ╰ Dilate by ${
+                        (radius2/radius).toFixed(3)
+                    }`;
+                    out += `\n ╰ Translate Vertically by ${
+                        (trans[0][1]-handles[0][1]).toFixed(3)
+                    }`;
+                    out += `\n ╰ Translate Horizontally by ${
+                        (trans[0][0]-handles[0][0]).toFixed(3)
+                    }`;
+                    out += `\n ╰ <input value="(x - (${getKlerp(handles[0][0], trans[0][0])}))² + (y - (${getKlerp(handles[0][1], trans[0][1])}))² = ${getKlerp(radius**2, radius2**2)}">`;
+                    return out;
+                }
+            },
+            "linear": {
+                defaultHandles: [[-2, 0.5], [2, -0.5]],
+                getDef: (handles, transforms) => {
+                    const m = (handles[0][1] - handles[1][1])/(handles[0][0]-handles[1][0]);
+                    let c = -m*handles[0][0];
+                    
+                    const mT = (transforms[0][1] - transforms[1][1])/(transforms[0][0]-transforms[1][0]);
+                    let c_t = -mT*transforms[0][0];
+                    let out = `y = ${
+                    m.toFixed(3)
+                    }x${formatNum(c)}; ${
+                    Math.max(handles[0][0], handles[1][0]).toFixed(3)
+                    } ≥ x ≥ ${Math.min(handles[0][0], handles[1][0]).toFixed(3)}`;
+                    out += `\n ╰ Dilate Horizontally by ${
+                        (mT/m).toFixed(3)
+                    }`;
+                    out += `\n ╰ Translate Vertically by ${
+                        (c_t-c).toFixed(3)
+                    }`;
+                    out += `\n ╰ New Range
+                        ${
+                    Math.max(transforms[0][0], transforms[1][0]).toFixed(3)
+                    } ≥ x ≥ ${Math.min(transforms[0][0], transforms[1][0]).toFixed(3)}`;
+                    // k(b-a)+a
+                    out += `\n ╰ <input value="(${getKlerp(m, mT)})x-${getKlerp(c, c_t)} \\left\\{${
+                        getKlerp(Math.max(handles[0][0], handles[1][0]), Math.max(transforms[0][0], transforms[1][0]))
+                    }\\ge x\\ge${
+                        getKlerp(Math.min(handles[0][0], handles[1][0]), Math.min(transforms[0][0], transforms[1][0]))
+                    }\\right\\}">`;
+                    //\left\{2k>x>-4k\right\}
+                    return out;
+                },
+                drawGraph: (handles, side, c) => {
+                    ctx.lineWidth = 2;
+                    ctx.strokeStyle = c || "blue";
+                    ctx.beginPath();
+                    const handle1 = mathToPixel(handles[0]);
+                    handle1[0] += 960 * side;
+                    ctx.moveTo(...handle1);
+                    const handle2 = mathToPixel(handles[1]);
+                    handle2[0] += 960 * side;
+                    ctx.lineTo(...handle2);
+                    ctx.stroke();
+                }
+            },
+            "parabola": {
+                defaultHandles: [[-2, -1], [0, 1], [2, -1]],
+                drawGraph: (handles, side, c) => {
+                    ctx.lineWidth = 2;
+                    ctx.strokeStyle = c || "blue";
+                    const startX = Math.min(
+                        handles[0][0],
+                        handles[1][0],
+                        handles[2][0]
+                    );
+                    const endX = Math.max(
+                        handles[0][0],
+                        handles[1][0],
+                        handles[2][0]
+                    );
+                    const [a, b, ci] = findParabolaCoefficients(...handles);
+                    ctx.beginPath();
+                    for (let x = startX; x <= endX; x += 0.1) {
+                        const y = a * (x ** 2) + b * x + ci;
+                        const pos = mathToPixel([x, y]);
+                        pos[0] += side * 960;
+                        if (x === startX) {
+                            ctx.moveTo(...pos);
+                        } else {
+                            ctx.lineTo(...pos);
+                        }
+                    }
+                    const y = a * (endX ** 2) + b * endX + ci;
+                    const pos = mathToPixel([endX, y]);
+                    pos[0] += side * 960;
+                    ctx.lineTo(...pos);
+
+                    ctx.stroke();
+                },
+                getDef: (handles, trans) => {
+                    const [a1, b1, c1] = findParabolaCoefficients(...handles);
+                    const [f1, h1, k1] = generalToTP(a1, b1, c1);
+                    const [a2, b2, c2] = findParabolaCoefficients(...trans);
+                    const [f2, h2, k2] = generalToTP(a2, b2, c2);
+                    const startX = Math.min(
+                        handles[0][0],
+                        handles[1][0],
+                        handles[2][0]
+                    );
+                    const endX = Math.max(
+                        handles[0][0],
+                        handles[1][0],
+                        handles[2][0]
+                    );
+                    const TstartX = Math.min(
+                        trans[0][0],
+                        trans[1][0],
+                        trans[2][0]
+                    );
+                    const TendX = Math.max(
+                        trans[0][0],
+                        trans[1][0],
+                        trans[2][0]
+                    );
+                    let out = `y = ${(f1).toFixed(3)}(x${formatNum(h1)})²${formatNum(k1)}; ${endX.toFixed(3)}≥ x ≥${startX.toFixed(3)}`;
+                    out += `\n ╰ Translate Horizontally by ${
+                        -(h2-h1).toFixed(3)
+                    }`;
+                    out += `\n ╰ Dilate Vertically (×a) ${
+                        (f2/f1).toFixed(3)
+                    }`;
+                    out += `\n ╰ Translate Vertically by ${
+                        (k2-k1).toFixed(3)
+                    }`;
+                    out += `\n ╰ New Range ${
+                        TendX.toFixed(3)}≥ x ≥${TstartX.toFixed(3)
+                    }`;
+                    out += `\n ╰ <input value="(${getKlerp(f1, f2)})(x + ${getKlerp(h1, h2)})^{2}+${getKlerp(k1, k2)}\\ \\left\\{${getKlerp(endX, TendX)}\\ge x\\ge${getKlerp(startX, TstartX)}\\right\\}">`;
+                    return out;
+                }
+            },
+            "cubic": {
+                defaultHandles: [[-3, 4], [-2, 6], [2, 1], [3, 3]],
+                drawGraph: (handles, side, col) => {
+                    ctx.lineWidth = 2;
+                    ctx.strokeStyle = col || "blue";
+                    const startX = Math.min(
+                        handles[0][0],
+                        handles[1][0],
+                        handles[2][0],
+                        handles[3][0],
+                    );
+                    const endX = Math.max(
+                        handles[0][0],
+                        handles[1][0],
+                        handles[2][0],
+                        handles[3][0],
+                    );
+                    const [a, b, c, d] = findCubicCoefficients(...handles);
+                    ctx.beginPath();
+                    for (let x = startX; x <= endX; x += 0.1) {
+                        const y = a * (x ** 3) + b * (x ** 2) + c * x + d;
+                        const pos = mathToPixel([x, y]);
+                        pos[0] += side * 960;
+                        if (x === startX) {
+                            ctx.moveTo(...pos);
+                        } else {
+                            ctx.lineTo(...pos);
+                        }
+                    }
+                    const y = a * (endX ** 3) + b * (endX ** 2) + c * endX + d;
+                    const pos = mathToPixel([endX, y]);
+                    pos[0] += side * 960;
+                    ctx.lineTo(...pos);
+
+                    ctx.stroke();
+                },
+                getDef: (handles, trans) => {
+                    const [a1, b1, c1, d1] = findParabolaCoefficients(...handles);
+                    const startX = Math.min(
+                        handles[0][0],
+                        handles[1][0],
+                        handles[2][0],
+                        handles[3][0],
+                    );
+                    const endX = Math.max(
+                        handles[0][0],
+                        handles[1][0],
+                        handles[2][0],
+                        handles[3][0],
+                    );
+                    const tstartX = Math.min(
+                        trans[0][0],
+                        trans[1][0],
+                        trans[2][0],
+                        trans[3][0],
+                    );
+                    const tendX = Math.max(
+                        trans[0][0],
+                        trans[1][0],
+                        trans[2][0],
+                        trans[3][0],
+                    );
+                    const minY = Math.min(handles[0][1], handles[1][1], handles[2][1], handles[3][1]);
+                    const maxY = Math.max(handles[0][1], handles[1][1], handles[2][1], handles[3][1]);
+
+                    const tminY = Math.min(trans[0][1], trans[1][1], trans[2][1], trans[3][1]);
+                    const tmaxY = Math.max(trans[0][1], trans[1][1], trans[2][1], trans[3][1]);
+                    const midX = (startX + endX) / 2;
+                    const tmidX = (tstartX + tendX) / 2;
+                    const midY = (minY + maxY) / 2;
+                    const tmidY = (tminY + tmaxY) / 2;
+
+                    let out = `y = ${(a1).toFixed(3)}x³ ${formatNum(b1)}x² ${formatNum(c1)}x ${formatNum(d1)}; ${endX.toFixed(3)}≥ x ≥${startX.toFixed(3)}`;
+                    out += `\n ╰ (Approximated!) Dilate Horizontally ${
+                        ((tendX-tstartX)/(endX-startX)).toFixed(3)
+                    }`;
+                    out += `\n ╰ (Approximated!) Dilate Vertically ${
+                        ((tmaxY-tminY)/(maxY-minY)).toFixed(3)
+                    }`;
+                    out += `\n ╰ (Approximated!) Translate Horizontally by ${
+                        (tmidX-midX).toFixed(3)
+                    }`;
+                    out += `\n ╰ (Approximated!) Translate Vertically by ${
+                        (tmidY-midY).toFixed(3)
+                    }`;
+                    
+                    return out;
+                }
+            },
+            "inverse": {
+                defaultHandles: [[-3, 4], [0, 3.5], [3, 3]],
+                drawGraph: (handles, side, col) => {
+                    ctx.lineWidth = 2;
+                    ctx.strokeStyle = col || "blue";
+                    const startX = Math.min(
+                        handles[0][0],
+                        handles[1][0],
+                        handles[2][0],
+                    );
+                    const endX = Math.max(
+                        handles[0][0],
+                        handles[1][0],
+                        handles[2][0],
+                    );
+                    const [a, b, c] = findHyperbolaCoefficients(...handles);
+                    ctx.beginPath();
+                    for (let x = startX; x <= endX; x += 0.1) {
+                        const y = (a*x + b) / (x + c);
+                        const pos = mathToPixel([x, y]);
+                        pos[0] += side * 960;
+                        if (x === startX) {
+                            ctx.moveTo(...pos);
+                        } else {
+                            ctx.lineTo(...pos);
+                        }
+                    }
+                    const y = (a*endX + b) / (endX + c);
+                    const pos = mathToPixel([endX, y]);
+                    pos[0] += side * 960;
+                    ctx.lineTo(...pos);
+
+                    ctx.stroke();
+                }
+            }
+        };
+        function drawHandles(handles, side, c, let) {
+            ctx.lineWidth = 2;
+            handles.forEach(handle => {
+                const p = mathToPixel(handle);
+                const x = p[0] + 960 * side;
+                const y = p[1];
+                ctx.beginPath();
+                ctx.arc(x, y, 16, 0, 2 * Math.PI);
+                ctx.font = "32px serif";
+                ctx.strokeStyle = ctx.fillStyle = handle[2] ? "red" : c || "black";
+                ctx.fillText(let || "A", x - 11, y + 12);
+                ctx.stroke();
+            });
+        }
+        let i = 5;
+        let f = 100;
+        const bg = document.querySelector("#bg");
+        let doHandles = true;
+        let _idx = 0;
+        function drawFrame() {
+            //ctx.putImageData(imageContainer, 0, 0);
+            ctx.fillStyle = "white";
+            ctx.fillRect(0, 0, 1920, 1080);
+            if (bg.naturalHeight > 0) {
+                ctx.globalAlpha = 0.3;
+                ctx.globalCompositeOperation = "multiply";
+                if (bg.naturalHeight > bg.naturalWidth) {
+                    const nh = bg.naturalWidth / (bg.naturalHeight / 1080);
+                    ctx.drawImage(bg, (960 - nh) / 2, 0, nh, 1080);
+                    ctx.drawImage(bg, (960 - nh) / 2 + 960, 0, nh, 1080);
+                } else {
+                    const nh = bg.naturalHeight / (bg.naturalWidth / 960);
+                    ctx.drawImage(bg, 0, (1080 - nh) / 2, 960, nh);
+                    ctx.drawImage(bg, 960, (1080 - nh) / 2, 960, nh);
+                }
+                ctx.globalAlpha = 1;
+                ctx.globalCompositeOperation = "source-over";
+            }
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = "black";
+            ctx.beginPath();
+            ctx.moveTo(960, 0);
+            ctx.lineTo(960, 1080);
+            ctx.stroke();
+            if (doHandles) {
+                gizmos.forEach(gizmo => {
+                    drawHandles(gizmo.handlePositions, 0, gizmo.col, gizmo.let);
+                    graphDB[gizmo.type].drawGraph(gizmo.handlePositions, 0, gizmo.col);
+                    drawHandles(gizmo.transformedPositions, 1, gizmo.col, gizmo.let);
+                    graphDB[gizmo.type].drawGraph(gizmo.transformedPositions, 1, gizmo.col);
+                });
+            } else {
+                gizmos.forEach(gizmo => {
+                    graphDB[gizmo.type].drawGraph(gizmo.handlePositions, 0, gizmo.col);
+                    graphDB[gizmo.type].drawGraph(gizmo.transformedPositions, 1, gizmo.col);
+                });
+            }
+            ctx.fillStyle = "black";
+            ctx.font = "18px monospace";
+            let t = gizmos.length + " curves";
+            ctx.fillText(t, 964, 20);
+            let secret = "ZXMUSHROOM63 WAS HERE - ";
+            let template = (new Array(t.length)).fill("");
+            template = template.map((x, i) => {
+                return  String.fromCharCode(
+                    secret[(Math.floor(_idx / 6) + i) % secret.length].charCodeAt(0) + Math.round(1.1 * (Math.random() - 0.5))
+                );
+            });
+            _idx++;
+            _idx %= secret.length * 6;
+            ctx.fillText(template.join(""), 964, 38);
+            setTimeout(drawFrame, 1000/30);
+        }
+        requestAnimationFrame(drawFrame);
+
+        let selected = null;
+        let url = "";
+        canvas.addEventListener("mousedown", (e) => {
+            if (e.button === 2 && e.shiftKey) {
+                alert("best image size is aspect ratio of 960x1080");
+                const inp = document.createElement("input");
+                inp.type = "file";
+                inp.accept = "image/*";
+                inp.addEventListener("input", ()=>{
+                    if (inp.files.length < 1) {
+                        return;
+                    }
+                    if (url) {
+                        URL.revokeObjectURL(url);
+                    }
+                    url = URL.createObjectURL(inp.files[0]);
+                    document.querySelector("#bg").src = url;
+                });
+                inp.click();
+                return;
+            }
+            const rect = canvas.getBoundingClientRect();
+            const ratio = 1080 / innerHeight;
+            const xOffset = 0;
+            //alert(e.x*ratio +","+ e.y*ratio);
+            const isSide = ((e.clientX - rect.x) * ratio) > 960;
+            const x = ((e.clientX - rect.x) * ratio) - 960 * isSide;
+            const y = ((e.clientY - rect.y) * ratio);
+            const mathPoint = pixelToMath([x, y]);
+            //document.querySelector("#total").innerText = [x, y, isSide].join(",");
+            let nearestDist = 999999;
+            let nearestHandle = null;
+            gizmos.forEach(gizmo => {
+                const arr = isSide ? gizmo.transformedPositions : gizmo.handlePositions;
+                arr.forEach(handle => {
+                    const d = dist(mathPoint, handle);
+                    if (d < nearestDist) {
+                        nearestDist = d;
+                        nearestHandle = handle;
+                    }
+                })
+            });
+            selected = nearestHandle;
+            selected[2] = 1;
+        });
+        canvas.addEventListener("mousemove", (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const ratio = 1080 / innerHeight;
+            if (!selected) {
+                return;
+            }
+            const isSide = ((e.clientX - rect.x) * ratio) > 960;
+            const x = ((e.clientX - rect.x) * ratio) - 960 * isSide;
+            const y = ((e.clientY - rect.y) * ratio);
+            const mathPoint = pixelToMath([x, y]);
+
+            selected[0] = mathPoint[0];
+            selected[1] = mathPoint[1];
+        });
+        addEventListener("keydown", (e) => {
+            if (e.key === "Escape") {
+                document.querySelector("#export").style.display = "none";
+            }
+            if (e.key === "e") {
+                document.querySelector("#export").style.display = "block";
+                const outTexts = gizmos.map(x => {
+                    if (!graphDB[x.type].getDef) {
+                        return;
+                    }
+                    return `[${x.let}, ${x.type.toUpperCase()}]\n` + x.let + ")  " + graphDB[x.type].getDef(
+                        x.handlePositions.map(x => [x[0], -x[1]]), //invert vertical coordinate space
+                        x.transformedPositions.map(x => [x[0], -x[1]])
+                    );
+                });
+                outTexts.sort();
+                let txt = `uhh press esc to close ig<br><br>`;
+                outTexts.forEach(arr => {
+                    txt += arr.replaceAll("\n", "<br>") + "<br><br>";
+                });
+                document.querySelector("#export").innerHTML = txt;
+            }
+            if (e.key === "h") {
+                doHandles = (!doHandles);
+            }
+            if (e.key === "q" && !selected) {
+                gizmos.forEach(gizmo => {
+                    let tmp = gizmo.transformedPositions;
+                    gizmo.transformedPositions = gizmo.handlePositions;
+                    gizmo.handlePositions = tmp;
+                });
+            }
+            if ((e.key === "Backspace" || e.key === "Delete") && selected) {
+                const idx = gizmos.indexOf(
+                    gizmos.find((g) => g.handlePositions.includes(selected) || g.transformedPositions.includes(selected))
+                );
+                if (idx !== -1) {
+                    gizmos.splice(idx, 1);
+                }
+            }
+        });
+        canvas.addEventListener("mouseup", () => {
+            if (selected) {
+                selected[2] = 0;
+                selected = null;
+            }
+        });
+        const colors = ["darkred", "red", "blue", "black", "green", "purple", "darkslategrey", "indigo", "olivedrab", "rebeccapurple"];
+        [...document.querySelectorAll("li[data-x]")].forEach(x => x.addEventListener("click", (e) => {
+            const type = x.getAttribute("data-x");
+            const clazz = graphDB[type];
+            const letters = gizmos.filter(x => !!x.let).map(x => x.let.charCodeAt(0));
+            let charCode = 65;
+            while (letters.includes(charCode)) {
+                charCode++;
+            }
+            if (clazz) {
+                gizmos.push({
+                    type: type,
+                    col: colors[Math.floor(colors.length * Math.random())],
+                    handlePositions: structuredClone(clazz.defaultHandles),
+                    transformedPositions: structuredClone(clazz.defaultHandles),
+                    let: String.fromCharCode(charCode)
+                });
+            }
+        }));
+        addEventListener("beforeunload", () => {
+            localStorage.setItem("kwwkam11100412", JSON.stringify(gizmos));
+        });
+
+        fb.fill(255);
+    </script>
+</body>
+
+</html>
