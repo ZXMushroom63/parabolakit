@@ -99,6 +99,9 @@
 
         this is a WIP btw
     </div>
+    <ins style="position: fixed;z-index: 100;left:0;bottom:0;pointer-events: none;user-select: none; color:magenta">
+        Made by ZXMushroom63
+    </ins>
     <script>
         const canvas = document.querySelector("canvas");
         const ctx = canvas.getContext("2d");
@@ -289,7 +292,7 @@
                     Math.max(transforms[0][0], transforms[1][0]).toFixed(3)
                     } ≥ x ≥ ${Math.min(transforms[0][0], transforms[1][0]).toFixed(3)}`;
                     // k(b-a)+a
-                    out += `\n ╰ <input value="(${getKlerp(m, mT)})x-${getKlerp(c, c_t)} \\left\\{${
+                    out += `\n ╰ <input value="(${getKlerp(m, mT)})x+${getKlerp(c, c_t)} \\left\\{${
                         getKlerp(Math.max(handles[0][0], handles[1][0]), Math.max(transforms[0][0], transforms[1][0]))
                     }\\ge x\\ge${
                         getKlerp(Math.min(handles[0][0], handles[1][0]), Math.min(transforms[0][0], transforms[1][0]))
