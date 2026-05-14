@@ -81,6 +81,7 @@
     <ul>
         <li>(click = add)</li>
         <li data-x="parabola">Parabola</li><br> <!-- 3 handles -->
+        <li data-x="x_parabola">X-Parabola</li><br> <!-- 3 handles -->
         <li data-x="linear">Linear</li><br> <!-- 2 handles -->
         <li data-x="cubic">Cubic</li><br> <!-- 4 handles -->
         <li data-x="disabled_inverse">Inverse/Hyperbola</li><br> <!-- 2 handles -->
@@ -100,7 +101,7 @@
         this is a WIP btw
     </div>
     <ins style="position: fixed;z-index: 100;left:0;bottom:0;pointer-events: none;user-select: none; color:magenta">
-       v1.2
+       v1.3
     </ins>
     <script>
         const canvas = document.querySelector("canvas");
@@ -386,6 +387,88 @@
                         TendX.toFixed(3)}≥ x ≥${TstartX.toFixed(3)
                     }`;
                     out += `\n ╰ <input value="(${getKlerp(f1, f2)})(x + ${getKlerp(h1, h2)})^{2}+${getKlerp(k1, k2)}\\ \\left\\{${getKlerp(endX, TendX)}\\ge x\\ge${getKlerp(startX, TstartX)}\\right\\}">`;
+                    return out;
+                }
+            },
+            "x_parabola": {
+                defaultHandles: [[-2, -1], [0, 1], [2, -1]],
+                drawGraph: (handles, side, c) => {
+                    handles = structuredClone(handles);
+                    handles = handles.map(x => [x[1], x[0]]);
+                    ctx.lineWidth = 2;
+                    ctx.strokeStyle = c || "blue";
+                    const startX = Math.min(
+                        handles[0][0],
+                        handles[1][0],
+                        handles[2][0]
+                    );
+                    const endX = Math.max(
+                        handles[0][0],
+                        handles[1][0],
+                        handles[2][0]
+                    );
+                    const [a, b, ci] = findParabolaCoefficients(...handles);
+                    ctx.beginPath();
+                    for (let x = startX; x <= endX; x += 0.1) {
+                        const y = a * (x ** 2) + b * x + ci;
+                        const pos = mathToPixel([y, x]);
+                        pos[0] += side * 960;
+                        if (x === startX) {
+                            ctx.moveTo(...pos);
+                        } else {
+                            ctx.lineTo(...pos);
+                        }
+                    }
+                    const y = a * (endX ** 2) + b * endX + ci;
+                    const pos = mathToPixel([y, endX]);
+                    pos[0] += side * 960;
+                    ctx.lineTo(...pos);
+
+                    ctx.stroke();
+                },
+                getDef: (handles, trans) => {
+                    handles = structuredClone(handles);
+                    handles = handles.map(x => [x[1], x[0]]);
+                    trans = structuredClone(trans);
+                    trans = trans.map(x => [x[1], x[0]]);
+                    const [a1, b1, c1] = findParabolaCoefficients(...handles);
+                    const [f1, h1, k1] = generalToTP(a1, b1, c1);
+                    const [a2, b2, c2] = findParabolaCoefficients(...trans);
+                    const [f2, h2, k2] = generalToTP(a2, b2, c2);
+                    const startX = Math.min(
+                        handles[0][0],
+                        handles[1][0],
+                        handles[2][0]
+                    );
+                    const endX = Math.max(
+                        handles[0][0],
+                        handles[1][0],
+                        handles[2][0]
+                    );
+                    const TstartX = Math.min(
+                        trans[0][0],
+                        trans[1][0],
+                        trans[2][0]
+                    );
+                    const TendX = Math.max(
+                        trans[0][0],
+                        trans[1][0],
+                        trans[2][0]
+                    );
+                    let out = `x = ${(f1).toFixed(3)}(y${formatNum(h1)})²${formatNum(k1)}; ${endX.toFixed(3)}≥ y ≥${startX.toFixed(3)}`;
+                    out += `\n ╰ Translate Horizontally by ${
+                        -(h2-h1).toFixed(3)
+                    }`;
+                    out += `\n ╰ Dilate Vertically (×a) ${
+                        (f2/f1).toFixed(3)
+                    }`;
+                    out += `\n ╰ Translate Vertically by ${
+                        (k2-k1).toFixed(3)
+                    }`;
+                    out += `\n ╰ New Range ${
+                        TendX.toFixed(3)}≥ x ≥${TstartX.toFixed(3)
+                    }`;
+                    out += `\n ╰ <input value="x = (${getKlerp(f1, f2)})(y + ${getKlerp(h1, h2)})^{2}+${getKlerp(k1, k2)}\\ \\left\\{${getKlerp(endX, TendX)}\\ge y\\ge${getKlerp(startX, TstartX)}\\right\\}">`;
                     return out;
                 }
             },
