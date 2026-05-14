@@ -101,7 +101,7 @@
         this is a WIP btw
     </div>
     <ins style="position: fixed;z-index: 100;left:0;bottom:0;pointer-events: none;user-select: none; color:magenta">
-       v1.3
+       v1.4k1
     </ins>
     <script>
         const canvas = document.querySelector("canvas");
@@ -254,6 +254,8 @@
                     );
                     const xOffset = formatNum(-handles[0][0]);
                     const yOffset = formatNum(-handles[0][1]);
+                    const xOffsetT = formatNum(-trans[0][0]);
+                    const yOffsetT = formatNum(-trans[0][1]);
                     let out = `(x${xOffset})² + (y${yOffset})² = ${(radius**2).toFixed(3)} = (${radius.toFixed(3)})²`
                     
                     out += `\n ╰ Dilate by ${
@@ -265,6 +267,7 @@
                     out += `\n ╰ Translate Horizontally by ${
                         (trans[0][0]-handles[0][0]).toFixed(3)
                     }`;
+                    out += `\n ╰ Transformed Formula:\nㅤㅤㅤ(x${xOffsetT})² + (y${yOffsetT})² = ${(radius2**2).toFixed(3)} = (${radius2.toFixed(3)})²`;
                     out += `\n ╰ <input value="(x - (${getKlerp(handles[0][0], trans[0][0])}))² + (y - (${getKlerp(handles[0][1], trans[0][1])}))² = ${getKlerp(radius**2, radius2**2)}">`;
                     return out;
                 }
@@ -288,8 +291,9 @@
                     out += `\n ╰ Translate Vertically by ${
                         (c_t-c).toFixed(3)
                     }`;
-                    out += `\n ╰ New Range
-                        ${
+                    out += `\n ╰ Transformed Formula:\nㅤㅤㅤy = ${
+                    mT.toFixed(3)
+                    }x${formatNum(c_t)}; ${
                     Math.max(transforms[0][0], transforms[1][0]).toFixed(3)
                     } ≥ x ≥ ${Math.min(transforms[0][0], transforms[1][0]).toFixed(3)}`;
                     // k(b-a)+a
@@ -383,9 +387,7 @@
                     out += `\n ╰ Translate Vertically by ${
                         (k2-k1).toFixed(3)
                     }`;
-                    out += `\n ╰ New Range ${
-                        TendX.toFixed(3)}≥ x ≥${TstartX.toFixed(3)
-                    }`;
+                    out += `\n ╰ Transformed Formula: \nㅤㅤㅤy = ${(f2).toFixed(3)}(x${formatNum(h2)})²${formatNum(k2)}; ${TendX.toFixed(3)}≥ x ≥${TstartX.toFixed(3)}`;
                     out += `\n ╰ <input value="(${getKlerp(f1, f2)})(x + ${getKlerp(h1, h2)})^{2}+${getKlerp(k1, k2)}\\ \\left\\{${getKlerp(endX, TendX)}\\ge x\\ge${getKlerp(startX, TstartX)}\\right\\}">`;
                     return out;
                 }
@@ -465,9 +467,7 @@
                     out += `\n ╰ Translate Vertically by ${
                         (k2-k1).toFixed(3)
                     }`;
-                    out += `\n ╰ New Range ${
-                        TendX.toFixed(3)}≥ x ≥${TstartX.toFixed(3)
-                    }`;
+                    out += `\n ╰ Transformed Formula: \nㅤㅤㅤx = ${(f2).toFixed(3)}(y${formatNum(h2)})²${formatNum(k2)}; ${TendX.toFixed(3)}≥ y ≥${TstartX.toFixed(3)}`;
                     out += `\n ╰ <input value="x = (${getKlerp(f1, f2)})(y + ${getKlerp(h1, h2)})^{2}+${getKlerp(k1, k2)}\\ \\left\\{${getKlerp(endX, TendX)}\\ge y\\ge${getKlerp(startX, TstartX)}\\right\\}">`;
                     return out;
                 }
