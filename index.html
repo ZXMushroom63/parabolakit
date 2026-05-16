@@ -101,7 +101,7 @@
         this is a WIP btw
     </div>
     <ins style="position: fixed;z-index: 100;left:0;bottom:0;pointer-events: none;user-select: none; color:magenta">
-       v1.4k1
+       v1.5k2
     </ins>
     <script>
         const canvas = document.querySelector("canvas");
@@ -225,7 +225,27 @@
             return [a, hb, c - (b ** 2 / (4 * a))];
         }
         function getKlerp(n1, n2) {
-            return ` k\\left(${(n2).toFixed(3)}-${(n1).toFixed(3)}\\right)+${n1.toFixed(3)} `;
+            //return ` k\\left(${(n2).toFixed(3)}-${(n1).toFixed(3)}\\right)+${n1.toFixed(3)} `;
+
+            if ((n2 - n1) === 0) {
+                return ` ${formatNum(n1) || "0"} `;
+            } else {
+                return ` ${(n2 - n1).toFixed(3)}k ${formatNum(n1)} `;
+            }
+        }
+        function getRangeOfParabola(parabolaConfig, domain) {
+            const parabola = (x)=>parabolaConfig[0]*(x**2) + parabolaConfig[1]*x + parabolaConfig[2];
+            let minVal = Infinity;
+            let maxVal = -Infinity;
+            for (let x = domain[0]; x < domain[1]; x += 0.1) { //might not include domain end
+                const y = parabola(x);
+                minVal = Math.min(minVal, y);
+                maxVal = Math.max(maxVal, y);
+            }
+            const endY = parabola(domain[1]);
+            minVal = Math.min(minVal, endY);
+            maxVal = Math.max(maxVal, endY);
+            return [minVal, maxVal];
         }
         const graphDB = {
             "circle": {
@@ -257,7 +277,7 @@
                     const xOffsetT = formatNum(-trans[0][0]);
                     const yOffsetT = formatNum(-trans[0][1]);
                     let out = `(x${xOffset})² + (y${yOffset})² = ${(radius**2).toFixed(3)} = (${radius.toFixed(3)})²`
-                    
+                    //out += `\n ╰ Transform: ${(deltaA).toFixed(3)} * f(x, y ${formatNum(trans[0][0]-handles[0][0])}) ${formatNum(trans[0][1]-handles[0][1])}`;
                     out += `\n ╰ Dilate by ${
                         (radius2/radius).toFixed(3)
                     }`;
@@ -268,7 +288,7 @@
                         (trans[0][0]-handles[0][0]).toFixed(3)
                     }`;
                     out += `\n ╰ Transformed Formula:\nㅤㅤㅤ(x${xOffsetT})² + (y${yOffsetT})² = ${(radius2**2).toFixed(3)} = (${radius2.toFixed(3)})²`;
-                    out += `\n ╰ <input value="(x - (${getKlerp(handles[0][0], trans[0][0])}))² + (y - (${getKlerp(handles[0][1], trans[0][1])}))² = ${getKlerp(radius**2, radius2**2)}">`;
+                    out += `\n ╰Desmos Code: <input value="(x - (${getKlerp(handles[0][0], trans[0][0])}))² + (y - (${getKlerp(handles[0][1], trans[0][1])}))² = ${getKlerp(radius**2, radius2**2)}">`;
                     return out;
                 }
             },
@@ -285,6 +305,8 @@
                     }x${formatNum(c)}; ${
                     Math.max(handles[0][0], handles[1][0]).toFixed(3)
                     } ≥ x ≥ ${Math.min(handles[0][0], handles[1][0]).toFixed(3)}`;
+                    out += `\n ╰ Fn Range: ${Math.max(handles[0][1], handles[1][1]).toFixed(3)} ≥ y ≥ ${Math.min(handles[0][1], handles[1][1]).toFixed(3)}`
+                    out += `\n ╰ Transform: f(${(mT/m).toFixed(3)}x) ${formatNum(c_t-c)}`;
                     out += `\n ╰ Dilate Horizontally by ${
                         (mT/m).toFixed(3)
                     }`;
@@ -297,7 +319,7 @@
                     Math.max(transforms[0][0], transforms[1][0]).toFixed(3)
                     } ≥ x ≥ ${Math.min(transforms[0][0], transforms[1][0]).toFixed(3)}`;
                     // k(b-a)+a
-                    out += `\n ╰ <input value="(${getKlerp(m, mT)})x+${getKlerp(c, c_t)} \\left\\{${
+                    out += `\n ╰Desmos Code: <input value="(${getKlerp(m, mT)})x+${getKlerp(c, c_t)} \\left\\{${
                         getKlerp(Math.max(handles[0][0], handles[1][0]), Math.max(transforms[0][0], transforms[1][0]))
                     }\\ge x\\ge${
                         getKlerp(Math.min(handles[0][0], handles[1][0]), Math.min(transforms[0][0], transforms[1][0]))
@@ -378,22 +400,28 @@
                         trans[2][0]
                     );
                     let out = `y = ${(f1).toFixed(3)}(x${formatNum(h1)})²${formatNum(k1)}; ${endX.toFixed(3)}≥ x ≥${startX.toFixed(3)}`;
+                    const deltaH = h2 - h1;
+                    const deltaA = f2 / f1;
+                    const [ minRange, maxRange ] = getRangeOfParabola([a1, b1, c1], [startX, endX]);
+                    out += `\n ╰ Fn Range: ${maxRange.toFixed(3)} ≥ y ≥ ${minRange.toFixed(3)}`;
+                    out += `\n ╰ Transform: ${(deltaA).toFixed(3)} * f(x ${formatNum(deltaH)}) ${formatNum(k2 - deltaA*k1)}`;
+                    //out += `\n ╰ Transform: ${(f2/f1).toFixed(3)}(f(x ${formatNum(-(h2-h1))})) ${formatNum(k2-k1)}`;
                     out += `\n ╰ Translate Horizontally by ${
-                        -(h2-h1).toFixed(3)
+                        (deltaH).toFixed(3)
                     }`;
                     out += `\n ╰ Dilate Vertically (×a) ${
-                        (f2/f1).toFixed(3)
+                        deltaA.toFixed(3)
                     }`;
                     out += `\n ╰ Translate Vertically by ${
-                        (k2-k1).toFixed(3)
+                        (k2 - deltaA*k1).toFixed(3)
                     }`;
-                    out += `\n ╰ Transformed Formula: \nㅤㅤㅤy = ${(f2).toFixed(3)}(x${formatNum(h2)})²${formatNum(k2)}; ${TendX.toFixed(3)}≥ x ≥${TstartX.toFixed(3)}`;
-                    out += `\n ╰ <input value="(${getKlerp(f1, f2)})(x + ${getKlerp(h1, h2)})^{2}+${getKlerp(k1, k2)}\\ \\left\\{${getKlerp(endX, TendX)}\\ge x\\ge${getKlerp(startX, TstartX)}\\right\\}">`;
+                    out += `\n ╰ Transformed Formula: \nㅤㅤㅤy = ${(f2).toFixed(3)}(x${formatNum(h2)})²${formatNum(k2)}; ${TendX.toFixed(3)} ≥ x ≥ ${TstartX.toFixed(3)}`;
+                    out += `\n ╰Desmos Code: <input value="(${getKlerp(f1, f2)})(x + ${getKlerp(h1, h2)})^{2}+${getKlerp(k1, k2)}\\ \\left\\{${getKlerp(endX, TendX)}\\ge x\\ge${getKlerp(startX, TstartX)}\\right\\}">`;
                     return out;
                 }
             },
             "x_parabola": {
-                defaultHandles: [[-2, -1], [0, 1], [2, -1]],
+                defaultHandles: [[-1, -2], [1, 0], [-1, 2]],
                 drawGraph: (handles, side, c) => {
                     handles = structuredClone(handles);
                     handles = handles.map(x => [x[1], x[0]]);
@@ -457,18 +485,23 @@
                         trans[1][0],
                         trans[2][0]
                     );
-                    let out = `x = ${(f1).toFixed(3)}(y${formatNum(h1)})²${formatNum(k1)}; ${endX.toFixed(3)}≥ y ≥${startX.toFixed(3)}`;
-                    out += `\n ╰ Translate Horizontally by ${
-                        -(h2-h1).toFixed(3)
-                    }`;
-                    out += `\n ╰ Dilate Vertically (×a) ${
-                        (f2/f1).toFixed(3)
-                    }`;
+                    const deltaH = h2 - h1;
+                    const deltaA = f2 / f1;
+                    let out = `x = ${(f1).toFixed(3)}(y${formatNum(h1)})²${formatNum(k1)}; ${endX.toFixed(3)} ≥ y ≥ ${startX.toFixed(3)}`;
+                    const [ minRange, maxRange ] = getRangeOfParabola([a1, b1, c1], [startX, endX]);
+                    out += `\n ╰ Fn Range: ${maxRange.toFixed(3)} ≥ x ≥ ${minRange.toFixed(3)}`;
+                    out += `\n ╰ Transform: ${(deltaA).toFixed(3)} * f(y ${formatNum(deltaH)}) ${formatNum(k2 - deltaA*k1)}`;
                     out += `\n ╰ Translate Vertically by ${
-                        (k2-k1).toFixed(3)
+                        deltaH.toFixed(3)
+                    }`;
+                    out += `\n ╰ Dilate Horizontally (×a) ${
+                        deltaA.toFixed(3)
+                    }`;
+                    out += `\n ╰ Translate Horizontally by ${
+                        (k2 - deltaA*k1).toFixed(3)
                     }`;
                     out += `\n ╰ Transformed Formula: \nㅤㅤㅤx = ${(f2).toFixed(3)}(y${formatNum(h2)})²${formatNum(k2)}; ${TendX.toFixed(3)}≥ y ≥${TstartX.toFixed(3)}`;
-                    out += `\n ╰ <input value="x = (${getKlerp(f1, f2)})(y + ${getKlerp(h1, h2)})^{2}+${getKlerp(k1, k2)}\\ \\left\\{${getKlerp(endX, TendX)}\\ge y\\ge${getKlerp(startX, TstartX)}\\right\\}">`;
+                    out += `\n ╰Desmos Code: <input value="x = (${getKlerp(f1, f2)})(y + ${getKlerp(h1, h2)})^{2}+${getKlerp(k1, k2)}\\ \\left\\{${getKlerp(endX, TendX)}\\ge y\\ge${getKlerp(startX, TstartX)}\\right\\}">`;
                     return out;
                 }
             },
@@ -776,6 +809,11 @@
             if (selected) {
                 selected[2] = 0;
                 selected = null;
+            }
+        });
+        document.querySelector("#export").addEventListener("mousedown", (e)=>{
+            if (e.target.tagName.toLowerCase() === "input") {
+                e.target.select();
             }
         });
         const colors = ["darkred", "red", "blue", "black", "green", "purple", "darkslategrey", "indigo", "olivedrab", "rebeccapurple"];
